@@ -122,7 +122,7 @@ listcol_df %>%
   )
 ```
 
-# example
+# nest
 ```{r}
 weather_df = 
   rnoaa::meteo_pull_monitors(
@@ -141,7 +141,6 @@ weather_df =
   select(name, id, everything())
 ```
 
-nest
 ```{r}
 weather_nest_df = 
   weather_df %>% 
@@ -173,7 +172,83 @@ weather_nest_df %>%
   mutate(
     model = map(data, weather_lm)
   )
+```
+
+unnesting
+```{r}
+weather_nest_df %>% 
+  unnest(data)
+```
+
+# example
+
+```{r}
+library(rvest)
+
+read_page_reviews <- function(url) {
+  
+  html = read_html(url)
+  
+  review_titles = 
+    html %>%
+    html_nodes(".a-text-bold span") %>%
+    html_text()
+  
+  review_stars = 
+    html %>%
+    html_nodes("#cm_cr-review_list .review-rating") %>%
+    html_text() %>%
+    str_extract("^\\d") %>%
+    as.numeric()
+  
+  review_text = 
+    html %>%
+    html_nodes(".review-text-content span") %>%
+    html_text() %>% 
+    str_replace_all("\n", "") %>% 
+    str_trim() %>% 
+    str_subset("The media could not be loaded.", negate = TRUE) %>% 
+    str_subset("^$", negate = TRUE)
+  
+  tibble(
+    title = review_titles,
+    stars = review_stars,
+    text = review_text
+  )
+}
 
 ```
 
+```{r}
+url_base = "https://www.amazon.com/product-reviews/B00005JNBQ/ref=cm_cr_arp_d_viewopt_rvwer?ie=UTF8&reviewerType=avp_only_reviews&sortBy=recent&pageNumber="
+```
+
+
+```{r}
+vec_urls = str_c(url_base, 1:5)
+output = vector("list", 5)
+
+for (i in 1:5) {
+  output[[i]] = read_page_reviews(vec_urls[[i]])
+}
+
+dynamite_reviews = bind_rows(output)
+```
+
+```{r}
+dynamite_reviews = map_df(vec_urls, read_page_reviews)
+```
+
+```{r}
+dynamite_reviews = 
+  tibble(
+    page = 1:5,
+    urls = str_c(url_base, page)) %>% 
+  mutate(reviews = map(urls, read_page_reviews)) %>% 
+  unnest(reviews)
+
+dynamite_reviews %>% 
+  select(-urls) %>% 
+  view()
+```
 

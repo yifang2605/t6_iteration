@@ -1,0 +1,179 @@
+---
+title: "Iteration and List columns"
+output: github_document
+---
+
+```{r}
+library(tidyverse)
+
+set.seed(1)
+
+```
+
+
+# list
+
+```{r}
+l = list(
+  vec_numeric = 5:8,
+  mat         = matrix(1:8, 2, 4),
+  vec_logical = c(TRUE, FALSE),
+  summary     = summary(rnorm(1000))
+)
+```
+
+access list item($ is not recommended)
+```{r}
+l$vec_numeric
+
+l[[1]]
+
+l[["vec_numeric"]]
+```
+
+# loops
+
+```{r}
+list_norms = 
+  list(
+    a = rnorm(20, 3, 1),
+    b = rnorm(20, 0, 5),
+    c = rnorm(20, 10, .2),
+    d = rnorm(20, -3, 1)
+  )
+
+
+```
+
+# mean and sd fuction
+```{r}
+mean_sd = function(x){
+  if(!is.numeric(x)){
+    stop("z-scores only work for numbers")
+  }
+  
+  if(length(x) <3){
+    stop("z-scores only work for 3 or more numbers")
+  }
+
+  mean_x = mean(x)
+  sd_x = sd(x)
+  
+  tibble(
+    mean = mean_x,
+    sd = sd_x
+  )
+}
+```
+
+`for` loop
+```{r}
+output = vector("list", 4)
+
+for (i in 1:4) {
+  output[[i]] = mean_sd(list_norms[[i]])
+}
+
+output 
+```
+
+map
+```{r}
+map(list_norms, mean_sd)
+```
+
+outher fuctions
+```{r}
+map(list_norms, median)
+map(list_norms, summary)
+```
+
+map variant
+```{r}
+map(list_norms, median)
+
+map_df(list_norms, mean_sd)
+```
+
+# list columns
+```{r}
+listcol_df = 
+  tibble(
+    name = c("a", "b", "c", "d"),
+    norm = list_norms
+  )
+
+listcol_df[["norm"]]
+
+map(listcol_df[["norm"]], mean_sd)
+```
+
+add list columns
+```{r}
+listcol_df %>% 
+  mutate(
+    m_sd = map(norm, mean_sd)
+  )
+
+
+listcol_df %>% 
+  mutate(
+    m_sd = map_df(norm, mean_sd)
+  )
+```
+
+# example
+```{r}
+weather_df = 
+  rnoaa::meteo_pull_monitors(
+    c("USW00094728", "USC00519397", "USS0023B17S"),
+    var = c("PRCP", "TMIN", "TMAX"), 
+    date_min = "2017-01-01",
+    date_max = "2017-12-31") %>%
+  mutate(
+    name = recode(
+      id, 
+      USW00094728 = "CentralPark_NY", 
+      USC00519397 = "Waikiki_HA",
+      USS0023B17S = "Waterhole_WA"),
+    tmin = tmin / 10,
+    tmax = tmax / 10) %>%
+  select(name, id, everything())
+```
+
+nest
+```{r}
+weather_nest_df = 
+  weather_df %>% 
+  nest(data = date:tmin)
+
+weather_nest_df[["data"]]
+```
+
+
+```{r}
+weather_nest_df[['data']][[1]]
+
+lm(tmax ~ tmin, data = weather_nest_df[['data']][[1]])
+```
+
+```{r}
+weather_lm = function(df){
+  lm(tmax ~ tmin, data = df)
+}
+  
+
+weather_lm(weather_nest_df[['data']][[1]])
+
+map(weather_nest_df[['data']], weather_lm)
+```
+
+```{r}
+weather_nest_df %>% 
+  mutate(
+    model = map(data, weather_lm)
+  )
+
+```
+
+
